@@ -2,6 +2,8 @@
 #include <cassert>
 #include "BVH.hpp"
 
+const int BUCKET_NUM = 32;
+
 BVHAccel::BVHAccel(std::vector<Object*> p, int maxPrimsInNode,
                    SplitMethod splitMethod)
     : maxPrimsInNode(std::min(255, maxPrimsInNode)), splitMethod(splitMethod),
@@ -75,22 +77,127 @@ BVHBuildNode* BVHAccel::recursiveBuild(std::vector<Object*> objects)
             break;
         }
 
-        auto beginning = objects.begin();
-        auto middling = objects.begin() + (objects.size() / 2);
-        auto ending = objects.end();
+        if (splitMethod == SplitMethod::NAIVE)
+        {
+			auto beginning = objects.begin();
+			auto middling = objects.begin() + (objects.size() / 2);
+			auto ending = objects.end();
 
-        auto leftshapes = std::vector<Object*>(beginning, middling);
-        auto rightshapes = std::vector<Object*>(middling, ending);
+			auto leftshapes = std::vector<Object*>(beginning, middling);
+			auto rightshapes = std::vector<Object*>(middling, ending);
 
-        assert(objects.size() == (leftshapes.size() + rightshapes.size()));
+			assert(objects.size() == (leftshapes.size() + rightshapes.size()));
 
-        node->left = recursiveBuild(leftshapes);
-        node->right = recursiveBuild(rightshapes);
+			node->left = recursiveBuild(leftshapes);
+			node->right = recursiveBuild(rightshapes);
+        }
+        else if (splitMethod == SplitMethod::SAH)
+        {
+            double minSAH = DBL_MAX;
+            std::vector<Object*> minLeft;
+            std::vector<Object*> minRight;
+
+            double p0 = centroidBounds.LongSideMin();
+            double seg = centroidBounds.LongSideLength() / BUCKET_NUM;
+
+			for (int i = 1; i <= BUCKET_NUM; ++i)
+			{
+                std::vector<Object*> outLeft;
+                std::vector<Object*> outRight;
+                splitObjects(objects, dim, p0+seg*i, outLeft, outRight);
+
+                double sah = costSAH(centroidBounds, outLeft, outRight);
+                if (sah < minSAH)
+                {
+                    minSAH = sah;
+                    minLeft = outLeft;
+                    minRight = outRight;
+                }
+			}
+
+            node->left = recursiveBuild(minLeft);
+            node->right = recursiveBuild(minRight);
+        }
 
         node->bounds = Union(node->left->bounds, node->right->bounds);
     }
 
     return node;
+}
+
+double BVHAccel::costSAH(const Bounds3& wholeBound, const std::vector<Object*>& leftObjects, const std::vector<Object*>& rightObjects)
+{
+	Bounds3 leftBound;
+	for (int i = 0; i < leftObjects.size(); ++i)
+        leftBound = Union(leftBound, leftObjects[i]->getBounds());
+
+	Bounds3 rightBound;
+	for (int i = 0; i < rightObjects.size(); ++i)
+        rightBound = Union(rightBound, rightObjects[i]->getBounds());
+
+    double Sn = wholeBound.SurfaceArea();
+    double Sl = leftBound.SurfaceArea();
+    double Sr = rightBound.SurfaceArea();
+
+    double Pl = Sl / Sn;
+    double Pr = Sr / Sn;
+
+    int Nl = leftObjects.size();
+    int Nr = rightObjects.size();
+
+    return (Sl * Nl + Sr * Nr) / Sn;
+}
+
+void BVHAccel::splitObjects(const std::vector<Object*> objects, int dim, double border, std::vector<Object*>& outLeft, std::vector<Object*>& outRight)
+{
+	switch (dim)
+	{
+	    case 0:
+	    {
+		    for (Object* obj : objects)
+		    {
+			    if (obj->getBounds().Centroid().x <= border)
+			    {
+				    outLeft.push_back(obj);
+			    }
+			    else
+			    {
+				    outRight.push_back(obj);
+			    }
+		    }
+	    }
+	    break;
+	    case 1:
+	    {
+		    for (Object* obj : objects)
+		    {
+			    if (obj->getBounds().Centroid().y <= border)
+			    {
+				    outLeft.push_back(obj);
+			    }
+			    else
+			    {
+				    outRight.push_back(obj);
+			    }
+		    }
+	    }
+	    break;
+	    case 2:
+	    {
+		    for (Object* obj : objects)
+		    {
+			    if (obj->getBounds().Centroid().z <= border)
+			    {
+				    outLeft.push_back(obj);
+			    }
+			    else
+			    {
+				    outRight.push_back(obj);
+			    }
+		    }
+	    }
+	    break;
+	}
 }
 
 Intersection BVHAccel::Intersect(const Ray& ray) const

@@ -86,6 +86,23 @@ class Bounds3
 
     inline bool IntersectP(const Ray& ray, const Vector3f& invDir,
                            const std::array<int, 3>& dirisNeg) const;
+
+    double LongSideLength() const
+    {
+        Vector3f d = Diagonal();
+        return std::max( std::max(d.x, d.y), d.z );
+    }
+
+    double LongSideMin() const
+    {
+		Vector3f d = Diagonal();
+		if (d.x > d.y && d.x > d.z)
+			return pMin.x;
+		else if (d.y > d.z)
+			return pMin.y;
+		else
+			return pMin.z;
+    }
 };
 
 

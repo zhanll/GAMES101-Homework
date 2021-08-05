@@ -40,6 +40,9 @@ public:
     // BVHAccel Private Methods
     BVHBuildNode* recursiveBuild(std::vector<Object*>objects);
 
+    double costSAH(const Bounds3& wholeBound, const std::vector<Object*>& leftObjects, const std::vector<Object*>& rightObjects);
+    void splitObjects(const std::vector<Object*> objects, int dim, double border, std::vector<Object*>& outLeft, std::vector<Object*>& outRight);
+
     // BVHAccel Private Data
     const int maxPrimsInNode;
     const SplitMethod splitMethod;
