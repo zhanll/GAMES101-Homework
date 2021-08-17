@@ -26,8 +26,8 @@ public:
         float t0, t1;
         float area = 4 * M_PI * radius2;
         if (!solveQuadratic(a, b, c, t0, t1)) return false;
-        if (t0 < 0) t0 = t1;
-        if (t0 < 0) return false;
+        if (t0 < 0.01) t0 = t1;
+        if (t0 < 0.01) return false;
         return true;
     }
     bool intersect(const Ray& ray, float &tnear, uint32_t &index) const
@@ -55,8 +55,8 @@ public:
         float c = dotProduct(L, L) - radius2;
         float t0, t1;
         if (!solveQuadratic(a, b, c, t0, t1)) return result;
-        if (t0 < 0) t0 = t1;
-        if (t0 < 0) return result;
+        if (t0 < 0.01) t0 = t1;
+        if (t0 < 0.01) return result;
         result.happened=true;
 
         result.coords = Vector3f(ray.origin + ray.direction * t0);
@@ -72,6 +72,7 @@ public:
 
     Vector3f evalDiffuseColor(const Vector2f &st)const {
         //return m->getColor();
+        return Vector3f(0);
     }
     Bounds3 getBounds(){
         return Bounds3(Vector3f(center.x-radius, center.y-radius, center.z-radius),

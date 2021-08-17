@@ -7,7 +7,7 @@
 
 #include "Vector.hpp"
 
-enum MaterialType { DIFFUSE};
+enum MaterialType { DIFFUSE, MICROFACET};
 
 class Material{
 private:
@@ -85,6 +85,44 @@ private:
         return a.x * B + a.y * C + a.z * N;
     }
 
+    /**
+     * Microfacet BRDF
+     */
+	float DistributionGGX(const Vector3f& N, const Vector3f& H, float roughness)
+	{
+		float a = roughness * roughness;
+		float a2 = a * a;
+		float NoH = dotProduct(N, H);
+		float NoH2 = NoH * NoH;
+
+		float denom = NoH2 * (a2 - 1.0) + 1.0;
+		denom = M_PI * denom * denom;
+
+		return a2 / std::max(denom, 0.0001f);
+	}
+
+	float GeometrySchlickGGX(float NdotV, float roughness)
+	{
+		float k = (roughness + 1.0) * (roughness + 1.0) / 8.0;
+		return NdotV / (NdotV * (1.0 - k) + k);
+	}
+
+	float GeometrySmith(const Vector3f& N, const Vector3f& V, const Vector3f& L, float roughness)
+	{
+		float NoL = std::max(dotProduct(N, L), 0.0f);
+		float NoV = std::max(dotProduct(N, V), 0.0f);
+		float G1 = GeometrySchlickGGX(NoL, roughness);
+		float G2 = GeometrySchlickGGX(NoV, roughness);
+		return G1 * G2;
+	}
+
+	Vector3f fresnelSchlick(const Vector3f& F0, const Vector3f& V, const Vector3f& H)
+	{
+		float VoH = std::max(dotProduct(V, H), 0.0f);
+		float c = std::pow(1.0 - VoH, 5.0);
+		return F0 + (Vector3f(1.0f) - F0) * c;
+	}
+
 public:
     MaterialType m_type;
     //Vector3f m_color;
@@ -93,6 +131,8 @@ public:
     Vector3f Kd, Ks;
     float specularExponent;
     //Texture tex;
+    float roughness;
+    float metallic;
 
     inline Material(MaterialType t=DIFFUSE, Vector3f e=Vector3f(0,0,0));
     inline MaterialType getType();
@@ -132,6 +172,7 @@ Vector3f Material::getColorAt(double u, double v) {
 Vector3f Material::sample(const Vector3f &wi, const Vector3f &N){
     switch(m_type){
         case DIFFUSE:
+        case MICROFACET:
         {
             // uniform sample on the hemisphere
             float x_1 = get_random_float(), x_2 = get_random_float();
@@ -148,6 +189,7 @@ Vector3f Material::sample(const Vector3f &wi, const Vector3f &N){
 float Material::pdf(const Vector3f &wi, const Vector3f &wo, const Vector3f &N){
     switch(m_type){
         case DIFFUSE:
+        case MICROFACET:
         {
             // uniform sample probability 1 / (2 * PI)
             if (dotProduct(wo, N) > 0.0f)
@@ -171,6 +213,25 @@ Vector3f Material::eval(const Vector3f &wi, const Vector3f &wo, const Vector3f &
             }
             else
                 return Vector3f(0.0f);
+            break;
+        }
+        case MICROFACET:
+        {
+            Vector3f H = normalize(wi + wo);
+			float NDF = DistributionGGX(N, H, roughness);
+
+			float G = GeometrySmith(N, wi, wo, roughness);
+
+            Vector3f F0 = Vector3f(0.04);
+            F0 = F0* (1.0f - metallic) + Kd * metallic;
+            Vector3f F = fresnelSchlick(F0, wo, H);
+
+            float NdotV = std::max(dotProduct(N, wi), 0.0f);
+            float NdotL = std::max(dotProduct(N, wo), 0.0f);
+			Vector3f numerator = NDF * G * F;
+			float denominator = std::max((4.0f * NdotL * NdotV), 0.001f);
+            return numerator / denominator;
+
             break;
         }
     }

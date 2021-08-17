@@ -32,9 +32,24 @@ int main(int argc, char** argv)
     MeshTriangle right("../models/cornellbox/right.obj", green);
     MeshTriangle light_("../models/cornellbox/light.obj", light);
 
+	Material* rock = new Material(MICROFACET);
+	rock->Kd = Vector3f(8);
+	rock->metallic = 0.1f;
+	rock->roughness = 0.9f;
+
+	Material* metal = new Material(MICROFACET);
+	metal->Kd = Vector3f(8);
+	metal->metallic = 0.9f;
+	metal->roughness = 0.1f;
+
+	Sphere sphere1(Vector3f(150, 100, 300), 100, rock);
+	Sphere sphere2(Vector3f(400, 100, 300), 100, metal);
+
     scene.Add(&floor);
     scene.Add(&shortbox);
     scene.Add(&tallbox);
+	//scene.Add(&sphere1);
+	//scene.Add(&sphere2);
     scene.Add(&left);
     scene.Add(&right);
     scene.Add(&light_);
